@@ -334,7 +334,7 @@ def main():
     parser.add_argument('--seed', type=int, default=0, help='random seed')
     parser.add_argument('--opt_steps', type=int, default=500, help='number of optimization steps')
     parser.add_argument('--opt_time', type=int, default=30, help='number of timesteps in the generation to be optimized')
-    parser.add_argument('--objective', type=str, default="gemini-binary", help='objective for optimization', choices = ["aesthetic", "hps", "pick", "white", "black", "gemini"])
+    parser.add_argument('--objective', type=str, default="gemini-binary", help='objective for optimization', choices = ["aesthetic", "hps", "pick", "white", "black", "gemini", "gemini-binary"])
     parser.add_argument('--mu', type=float, default=0.01, help='control the precison of gradient approxmiation')
     parser.add_argument('--gamma', type=float, default=0., help='coefficient for the probability regularization')
     parser.add_argument('--subsample', type=int, default=1, help='subsample factor for the computing the probability regularization')
@@ -363,7 +363,7 @@ def main():
         pipeline.enable_vae_slicing()
     elif args.sd_model == "sdxl-lightning":
         num_sampling_steps = 8
-        guidance_scale = 0.0
+        guidance_scale = 1.0
         model_id = "stabilityai/stable-diffusion-xl-base-1.0"
         unet = UNet2DConditionModel.from_pretrained(model_id, subfolder="unet", torch_dtype=torch.float16, use_safetensors=True, variant="fp16")
         unet.load_state_dict(load_file(hf_hub_download("ByteDance/SDXL-Lightning", "sdxl_lightning_8step_unet.safetensors")))
