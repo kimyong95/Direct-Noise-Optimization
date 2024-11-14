@@ -115,7 +115,7 @@ def sequential_sampling(pipeline, unet, sampler, prompt_embeds, added_cond_kwarg
     model_time = 0
     while not sampler.is_finished():
         model_kwargs = sampler.prepare_model_kwargs(prompt_embeds = prompt_embeds)
-        #model_output = pipeline.unet(**model_kwargs)
+        # model_output = pipeline.unet(**model_kwargs, added_cond_kwargs=added_cond_kwargs)
         model_output = checkpoint.checkpoint(unet, model_kwargs["sample"], model_kwargs["timestep"], model_kwargs["encoder_hidden_states"], None, None, None, None, added_cond_kwargs)
         sampler.step(model_output) 
 
@@ -343,6 +343,7 @@ def main():
     parser.add_argument('--sd_model', type=str, default="sdxl", help='model for the stable diffusion', choices = ["sdxl", "sdxl-lightning"])
     parser.add_argument('--grad_estimate_batchsize', type=int, default=8, help='batch size per device')
     parser.add_argument('--grad_estimate_total_num', type=int, default=32, help='number of samples for gradient estimation')
+    parser.add_argument('--load_init_noise', type=str, default=None, help='load init noise')
     args = parser.parse_args()
 
     wandb_name = args.name
@@ -386,7 +387,13 @@ def main():
     loss_fn = RFUNCTIONS[args.objective](inference_dtype = torch.float32, device = args.device)
 
     torch.manual_seed(args.seed)
-    noise_vectors = torch.randn(num_sampling_steps + 1, 4, 128, 128, device = args.device)
+
+    if args.load_init_noise is not None:
+        epsilon = torch.load(args.load_init_noise)
+        noise_vectors = epsilon.flip(0).to(args.device)
+    else:
+        noise_vectors = torch.randn(num_sampling_steps + 1, 4, 128, 128, device = args.device)
+    
     noise_vectors.requires_grad_(True)
     optimize_groups = [{"params":noise_vectors, "lr":args.lr}]
     optimizer = torch.optim.AdamW(optimize_groups)
@@ -418,17 +425,6 @@ def main():
     add_time_ids = torch.cat([negative_add_time_ids, add_time_ids], dim=0).to(args.device)
 
     added_cond_kwargs = {"text_embeds": add_text_embeds, "time_ids": add_time_ids}
-
-    path_name = f"SDXL-{time.strftime('%Y-%m-%d-%H-%M-%S')}"
-    output_path = os.path.join(args.output, path_name)
-
-    if os.path.exists(output_path):
-        shutil.rmtree(output_path)
-    os.makedirs(output_path)
-    
-    # save args
-    with open(os.path.join(output_path, "args.json"), "w") as f:
-        json.dump(args.__dict__, f, indent = 4)
 
     # start optimization, opt fpr using fp16 mixed precision
     use_amp = True
