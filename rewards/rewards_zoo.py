@@ -16,8 +16,8 @@ import numpy as np
 import inspect
 
 # Local Model Path: Change to the model path to your own model path
-CLIP_PATH = '/mnt/workspace/workgroup/tangzhiwei.tzw/clip-vit-large-patch14'
-AESTHETIC_PATH = '/mnt/workspace/workgroup/tangzhiwei.tzw/reward_optimization/reward_opt/assets/sac+logos+ava1-l14-linearMSE.pth'
+CLIP_PATH = "openai/clip-vit-large-patch14"
+AESTHETIC_PATH = '../d3po/d3po_pytorch/assets/sac+logos+ava1-l14-linearMSE.pth'
 HPS_V2_PATH = "/mnt/workspace/workgroup/tangzhiwei.tzw/HPS_v2_compressed.pt"
 PICK_SCORE_PATH = "/mnt/workspace/workgroup/tangzhiwei.tzw/pickscore"
 
@@ -46,6 +46,7 @@ class AestheticScorerDiff(torch.nn.Module):
     def __init__(self, dtype):
         super().__init__()
         self.clip = CLIPModel.from_pretrained(CLIP_PATH)
+        self.processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
         self.mlp = MLPDiff()
         state_dict = torch.load(AESTHETIC_PATH)
         self.mlp.load_state_dict(state_dict)
@@ -54,24 +55,19 @@ class AestheticScorerDiff(torch.nn.Module):
 
     def __call__(self, images):
         device = next(self.parameters()).device
-        embed = self.clip.get_image_features(pixel_values=images)
+        inputs = self.processor(images=images, return_tensors="pt")
+        inputs = {k: v.to(self.dtype).to(device) for k, v in inputs.items()}
+        embed = self.clip.get_image_features(**inputs)
         embed = embed / torch.linalg.vector_norm(embed, dim=-1, keepdim=True)
         return self.mlp(embed).squeeze(1)
 
 def aesthetic_loss_fn(device=None,
                      inference_dtype=None):
     
-    target_size = 224
-    normalize = torchvision.transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073],
-                                                std=[0.26862954, 0.26130258, 0.27577711])
     scorer = AestheticScorerDiff(dtype=inference_dtype).to(device)
     scorer.requires_grad_(False)
-    target_size = 224
-    def loss_fn(im_pix_un, prompts=None):
-        im_pix = ((im_pix_un / 2) + 0.5).clamp(0, 1) 
-        im_pix = torchvision.transforms.Resize(target_size)(im_pix)
-        im_pix = normalize(im_pix).to(im_pix_un.dtype)
-        rewards = scorer(im_pix)
+    def loss_fn(images, prompts=None):
+        rewards = scorer(images)
         loss = -1 * rewards
 
         return loss
@@ -230,12 +226,7 @@ def clip_score(inference_dtype=None, device=None):
 def jpeg_compressibility(inference_dtype=None, device=None):
     import io
     import numpy as np
-    def loss_fn(im_pix_un, prompts):
-        images = ((im_pix_un / 2) + 0.5).clamp(0, 1)
-        if isinstance(images, torch.Tensor):
-            images = (images * 255).round().clamp(0, 255).to(torch.uint8).cpu().numpy()
-            images = images.transpose(0, 2, 3, 1)  # NCHW -> NHWC
-        images = [Image.fromarray(image) for image in images]
+    def loss_fn(images, prompts):
         buffers = [io.BytesIO() for _ in images]
         for image, buffer in zip(images, buffers):
             image.save(buffer, format="JPEG", quality=95)
@@ -243,6 +234,19 @@ def jpeg_compressibility(inference_dtype=None, device=None):
         return torch.tensor(sizes, dtype=inference_dtype, device=device)
 
     return loss_fn
+
+def jpeg_incompressibility(inference_dtype=None, device=None):
+    import io
+    import numpy as np
+    def loss_fn(images, prompts):
+        buffers = [io.BytesIO() for _ in images]
+        for image, buffer in zip(images, buffers):
+            image.save(buffer, format="JPEG", quality=95)
+        sizes = [buffer.tell() / 1000 for buffer in buffers]
+        return - torch.tensor(sizes, dtype=inference_dtype, device=device)
+
+    return loss_fn
+
 
 # return value: lower better
 def gemini_binary(inference_dtype=None, device=None):

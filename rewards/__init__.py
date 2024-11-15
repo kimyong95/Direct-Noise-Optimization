@@ -6,7 +6,8 @@ RFUNCTIONS = {
     "pick" : pick_loss_fn,
     "white" : white_loss_fn,
     "black" : black_loss_fn,
-    "jpeg": jpeg_compressibility,
+    "compressibility": jpeg_compressibility,
+    "incompressibility": jpeg_incompressibility,
     "gemini-binary": gemini_binary,
     "gemini": gemini,
 }

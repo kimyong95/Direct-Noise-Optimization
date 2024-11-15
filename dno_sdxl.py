@@ -334,7 +334,7 @@ def main():
     parser.add_argument('--seed', type=int, default=0, help='random seed')
     parser.add_argument('--opt_steps', type=int, default=500, help='number of optimization steps')
     parser.add_argument('--opt_time', type=int, default=30, help='number of timesteps in the generation to be optimized')
-    parser.add_argument('--objective', type=str, default="gemini-binary", help='objective for optimization', choices = ["aesthetic", "hps", "pick", "white", "black", "gemini", "gemini-binary"])
+    parser.add_argument('--objective', type=str, default="gemini-binary", help='objective for optimization', choices = RFUNCTIONS.keys())
     parser.add_argument('--mu', type=float, default=0.01, help='control the precison of gradient approxmiation')
     parser.add_argument('--gamma', type=float, default=0., help='coefficient for the probability regularization')
     parser.add_argument('--subsample', type=int, default=1, help='subsample factor for the computing the probability regularization')
