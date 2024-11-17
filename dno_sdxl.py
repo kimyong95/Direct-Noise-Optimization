@@ -333,7 +333,6 @@ def main():
     parser.add_argument('--device', type=str, default="cuda", help='device for optimization')
     parser.add_argument('--seed', type=int, default=0, help='random seed')
     parser.add_argument('--opt_steps', type=int, default=500, help='number of optimization steps')
-    parser.add_argument('--opt_time', type=int, default=30, help='number of timesteps in the generation to be optimized')
     parser.add_argument('--objective', type=str, default="gemini-binary", help='objective for optimization', choices = RFUNCTIONS.keys())
     parser.add_argument('--mu', type=float, default=0.01, help='control the precison of gradient approxmiation')
     parser.add_argument('--gamma', type=float, default=0., help='coefficient for the probability regularization')
@@ -444,7 +443,7 @@ def main():
                                             eta = args.eta, 
                                             cfg_scale = guidance_scale, 
                                             device = args.device,
-                                            opt_timesteps = args.opt_time)
+                                            opt_timesteps = num_sampling_steps)
 
             sample = sequential_sampling(pipeline, unet, ddim_sampler, prompt_embeds = prompt_embeds,added_cond_kwargs = added_cond_kwargs, noise_vectors = noise_vectors)
             sample = decode_latent(pipeline.vae, sample.unsqueeze(0))[0]
@@ -475,7 +474,7 @@ def main():
                                                 eta = args.eta, 
                                                 cfg_scale = guidance_scale, 
                                                 device = args.device,
-                                                opt_timesteps = args.opt_time)
+                                                opt_timesteps = num_sampling_steps)
                 
                 i_start = i * grad_estimate_batchsize
                 i_end = (i + 1) * grad_estimate_batchsize
@@ -508,7 +507,7 @@ def main():
             loss = torch.sum(est_grad * sample)
             
             if args.gamma > 0:
-                reg_loss = compute_probability_regularization(noise_vectors, args.eta, args.opt_time, args.subsample)
+                reg_loss = compute_probability_regularization(noise_vectors, args.eta, num_sampling_steps, args.subsample)
                 loss = loss + args.gamma * reg_loss
 
             grad_scaler.scale(loss).backward()
