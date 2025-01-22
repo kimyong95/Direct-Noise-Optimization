@@ -348,7 +348,7 @@ def main():
     wandb_name = args.name
 
     run = wandb.init(
-        project="finetune-stable-diffusion",
+        project="guide-stable-diffusion",
         name=wandb_name,
         config=args,
     )
