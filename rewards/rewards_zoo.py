@@ -253,7 +253,7 @@ def gemini_binary(inference_dtype=None, device=None):
     from utils.rewards import GeminiQuestion
     reward_func = GeminiQuestion()
     reward_func = reward_func.to(device)
-    query = "Does the image accurately, precisely and comprehensively described by the prompt '{target_prompt}'? Answer score=0 (no) or score=1 (yes).\nAnswer in the format: Score=(score), Reason=(reason)."
+    query = "Does the prompt '{target_prompt}' accurately describe the image? Answer score=0 (no) or score=1 (yes).\nAnswer in the format: Score=score, Reason=reason."
     def loss_fn(images, prompts):
         scores, texts = reward_func(images, prompts, query, max_reward=1.0)
         return - scores
@@ -266,7 +266,7 @@ def gemini(inference_dtype=None, device=None):
     reward_func = reward_func.to(device)
     query = inspect.cleandoc("""
         Does the prompt '{target_prompt}' accurately describe the image? Rate from 1 (inaccurate) to 5 (accurate).
-        Answer in the format: Score=(score), Reason=(reason).
+        Answer in the format: Score=score, Reason=reason.
     """)
     def loss_fn(images, prompts):
         scores, texts = reward_func(images, prompts, query, max_reward=5.0)
