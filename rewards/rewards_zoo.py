@@ -226,7 +226,7 @@ def clip_score(inference_dtype=None, device=None):
 def jpeg_compressibility(inference_dtype=None, device=None):
     import io
     import numpy as np
-    def loss_fn(images, prompts):
+    def loss_fn(images, prompt):
         buffers = [io.BytesIO() for _ in images]
         for image, buffer in zip(images, buffers):
             image.save(buffer, format="JPEG", quality=95)
@@ -238,7 +238,7 @@ def jpeg_compressibility(inference_dtype=None, device=None):
 def jpeg_incompressibility(inference_dtype=None, device=None):
     import io
     import numpy as np
-    def loss_fn(images, prompts):
+    def loss_fn(images, prompt):
         buffers = [io.BytesIO() for _ in images]
         for image, buffer in zip(images, buffers):
             image.save(buffer, format="JPEG", quality=95)
@@ -254,8 +254,8 @@ def gemini_binary(inference_dtype=None, device=None):
     reward_func = GeminiQuestion()
     reward_func = reward_func.to(device)
     query = "Does the prompt '{target_prompt}' accurately describe the image? Answer score=0 (no) or score=1 (yes).\nAnswer in the format: Score=score, Reason=reason."
-    def loss_fn(images, prompts):
-        scores, texts = reward_func(images, prompts, query, max_reward=1.0)
+    def loss_fn(images, prompt):
+        scores, texts = reward_func(images, prompt, query, max_reward=1.0)
         return - scores
     return loss_fn
 
@@ -268,7 +268,7 @@ def gemini(inference_dtype=None, device=None):
         Does the prompt '{target_prompt}' accurately describe the image? Rate from 1 (inaccurate) to 5 (accurate).
         Answer in the format: Score=score, Reason=reason.
     """)
-    def loss_fn(images, prompts):
-        scores, texts = reward_func(images, prompts, query, max_reward=5.0)
+    def loss_fn(images, prompt):
+        scores, texts = reward_func(images, prompt, query, max_reward=5.0)
         return - scores
     return loss_fn
