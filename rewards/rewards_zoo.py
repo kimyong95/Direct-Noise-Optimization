@@ -260,6 +260,17 @@ def gemini_binary(inference_dtype=None, device=None):
     return loss_fn
 
 # return value: lower better
+def llama_binary(inference_dtype=None, device=None):
+    from utils.rewards import LlamaQuestion
+    reward_func = LlamaQuestion()
+    reward_func = reward_func.to(device)
+    query = "Does the prompt '{target_prompt}' accurately describe the image? Answer score=0 (no) or score=1 (yes).\nAnswer in the format: Score=score, Reason=reason."
+    def loss_fn(images, prompt):
+        scores, texts = reward_func(images, prompt, query, max_reward=1.0)
+        return - scores
+    return loss_fn
+
+# return value: lower better
 def gemini(inference_dtype=None, device=None):
     from utils.rewards import GeminiQuestion
     reward_func = GeminiQuestion()

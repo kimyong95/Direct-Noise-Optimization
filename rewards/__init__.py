@@ -9,5 +9,6 @@ RFUNCTIONS = {
     "compressibility": jpeg_compressibility,
     "incompressibility": jpeg_incompressibility,
     "gemini-binary": gemini_binary,
+    "llama-binary": llama_binary,
     "gemini": gemini,
 }
