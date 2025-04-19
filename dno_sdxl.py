@@ -345,7 +345,7 @@ def main():
     parser.add_argument('--output', type=str, default="output", help='output path')
     parser.add_argument('--sd_model', type=str, default="sdxl", help='model for the stable diffusion', choices = ["sdxl", "sdxl-lightning"])
     parser.add_argument('--grad_estimate_batchsize', type=int, default=8, help='batch size per device')
-    parser.add_argument('--grad_estimate_total_num', type=int, default=32, help='number of samples for gradient estimation')
+    parser.add_argument('--grad_estimate_total_num', type=int, default=16, help='number of samples for gradient estimation')
     parser.add_argument('--load_init_noise', type=str, default=None, help='load init noise')
     args = parser.parse_args()
 
@@ -539,15 +539,14 @@ def main():
         torch.save(noise_vectors, save_noise_path)
 
         print(f"step : {step}, reward : {reward}")
-        wandb.log({
+        log_data = {
             "epoch": step,
             "train/score_mean": losses_mean.mean(),
-            "score_f0_mean": losses[0].mean(),
-            "score_f1_mean": losses[1].mean(),
-            "score_f2_mean": losses[2].mean(),
-            "score_f3_mean": losses[3].mean(),
             "validation/score_mean": -reward,
-        })
+        }
+        for i, l in enumerate(losses):
+            log_data[f"score_f{i}_mean"] = l.mean()
+        wandb.log(log_data)
         ############################################################################
 
 if __name__ == "__main__":
