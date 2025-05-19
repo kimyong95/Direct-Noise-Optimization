@@ -327,12 +327,9 @@ def compute_probability_regularization(noise_vectors, eta, opt_time, subsample, 
     return reg_loss
 
 def main():
-    def list_of_strings(arg):
-        return arg.split(";")
     parser = argparse.ArgumentParser(description='Diffusion Optimization with Differentiable Objective')
     parser.add_argument('--name', type=str, default="dno", help='name of the experiment')
     parser.add_argument('--prompt', type=str, default="A robotic cat and a robotic dog playing with a football on the moon. The cat wearing a hat, and dog wearing a scarf.", help='prompt for the optimization')
-    parser.add_argument('--reward_prompts', type=list_of_strings, default="They playing with football on the moon.;A robotic cat and a robotic dog playing with a football on the moon.;A robotic cat and a robotic dog playing with a football on the moon. The dog wearing a scarf.;A robotic cat and a robotic dog playing with a football on the moon. The cat wearing a hat, and dog wearing a scarf.", help='prompt for the optimization')
     parser.add_argument('--eta', type=float, default=1.0, help='eta for the DDIM algorithm, eta=0 is ODE-based sampling while eta>0 is SDE-based sampling')
     parser.add_argument('--device', type=str, default="cuda", help='device for optimization')
     parser.add_argument('--seed', type=int, default=0, help='random seed')
@@ -344,8 +341,8 @@ def main():
     parser.add_argument('--lr', type=float, default=0.001, help='stepsize for optimization')
     parser.add_argument('--output', type=str, default="output", help='output path')
     parser.add_argument('--sd_model', type=str, default="sdxl", help='model for the stable diffusion', choices = ["sdxl", "sdxl-lightning"])
-    parser.add_argument('--grad_estimate_batchsize', type=int, default=8, help='batch size per device')
-    parser.add_argument('--grad_estimate_total_num', type=int, default=16, help='number of samples for gradient estimation')
+    parser.add_argument('--grad_estimate_batchsize', type=int, default=32, help='batch size per device')
+    parser.add_argument('--grad_estimate_total_num', type=int, default=32, help='number of samples for gradient estimation')
     parser.add_argument('--load_init_noise', type=str, default=None, help='load init noise')
     args = parser.parse_args()
 
@@ -454,7 +451,7 @@ def main():
             sample_image = pipeline.image_processor.postprocess(sample.unsqueeze(0).detach(), output_type="pil")[0]
 
         with torch.no_grad():
-            reward = - loss_fn([sample_image], args.reward_prompts[-1]).item()
+            reward = - loss_fn([sample_image], [args.prompt]).item()
         ############################################################################
 
         ############################ Estimate gradient #############################
@@ -486,23 +483,18 @@ def main():
                 _samples = batch_sequential_sampling(pipeline, unet, ddim_sampler, prompt_embeds = prompt_embeds, added_cond_kwargs = added_cond_kwargs, noise_vectors = cand_noise_vectors[:,i_start:i_end])
                 _samples = decode_latent(pipeline.vae, _samples)
                 _samples_image = pipeline.image_processor.postprocess(_samples, output_type="pil")
-                _losses = []
-                for reward_prompt in args.reward_prompts:
-                    _loss = loss_fn(_samples_image, reward_prompt)
-                    _losses.append(_loss)
-                _losses = torch.stack(_losses, dim=0)
+                _losses = loss_fn(_samples_image, [args.prompt] * _samples.shape[0])
 
                 samples.append(_samples)
                 samples_image.extend(_samples_image)
                 losses.append(_losses)
 
             samples = torch.cat(samples)
-            losses = torch.cat(losses, dim = -1)
-            losses_mean = losses.mean(dim = 0) # mean across prompts
+            losses = torch.cat(losses)
 
             est_grad = torch.zeros_like(samples[-1])
             for i in range(grad_estimate_total_num):
-                est_grad += (losses_mean[i] - losses_mean[-1]) * (samples[i] - samples[-1])
+                est_grad += (losses[i] - losses[-1]) * (samples[i] - samples[-1])
         
         est_grad = est_grad.unsqueeze(0)
         est_grad /= (torch.norm(est_grad) + 1e-3)
@@ -539,14 +531,11 @@ def main():
         torch.save(noise_vectors, save_noise_path)
 
         print(f"step : {step}, reward : {reward}")
-        log_data = {
+        wandb.log({
             "epoch": step,
-            "train/score_mean": losses_mean.mean(),
+            "train/score_mean": losses.mean().item(),
             "validation/score_mean": -reward,
-        }
-        for i, l in enumerate(losses):
-            log_data[f"score_f{i}_mean"] = l.mean()
-        wandb.log(log_data)
+        })
         ############################################################################
 
 if __name__ == "__main__":
